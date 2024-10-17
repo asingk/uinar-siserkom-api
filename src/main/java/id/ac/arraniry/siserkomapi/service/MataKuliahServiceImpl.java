@@ -27,8 +27,12 @@ public class MataKuliahServiceImpl implements MataKuliahService {
     }
 
     @Override
-    public Page<MataKuliah> findAllCollectionModel(String id, String nama, Pageable pageable) {
-        return matkulRepo.findByIdStartsWithOrNamaContainingIgnoreCase(id, nama, pageable);
+    public Page<MataKuliah> findAllCollectionModel(String id, String nama, Boolean disabled, Pageable pageable) {
+        if (null == disabled) {
+            return matkulRepo.findByIdStartsWithOrNamaContainingIgnoreCase(id, nama, pageable);
+        } else {
+            return matkulRepo.findByIdStartsWithOrNamaContainingIgnoreCaseAndIsDisabled(id, nama, disabled, pageable);
+        }
     }
 
     @Override

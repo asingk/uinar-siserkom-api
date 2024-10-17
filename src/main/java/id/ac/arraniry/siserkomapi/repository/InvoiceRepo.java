@@ -10,9 +10,9 @@ import java.util.Optional;
 
 public interface InvoiceRepo extends JpaRepository<Invoice, String> {
     List<Invoice> findByMahasiswaIdOrderByCreatedAtDesc(String nim);
-    Optional<Invoice> findTopByMahasiswaIdOrderByCreatedAtDesc(String nim);
-    List<Invoice> findByMahasiswaIdAndIsLulusUjianOrderByCreatedAtDesc(String nim, Boolean isLulusUjian);
     Optional<Invoice> findByIdAndKelasId(String noInvoice, Integer kelasId);
     Page<Invoice> findByIdStartsWithOrMahasiswaIdStartsWith(String id, String nim, Pageable pageable);
     List<Invoice> findByKelasIdOrderByMahasiswaNamaAsc(Integer kelasId);
+    Optional<Invoice> findByMahasiswaIdAndIsLulusUjian(String nim, Boolean isLulusUjian);
+    Optional<Invoice> findByMahasiswaIdAndJenisInvoiceIdAndIsSudahBayar(String nim, Integer jenisInvoiceId, Boolean isSudahBayar);
 }

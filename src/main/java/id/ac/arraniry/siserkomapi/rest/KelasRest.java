@@ -40,8 +40,7 @@ public class KelasRest {
     @Operation(summary = "Mencari kelas")
     @GetMapping()
     public PagedModel<KelasModel> getAll(@RequestParam(name = "page", defaultValue = "0") Integer page,
-                                         @RequestParam(name = "size", defaultValue = "100") Integer size,
-                                         @RequestParam(name = "jenisInvoice", required = false) Integer jenisInvoice) {
+                                         @RequestParam(name = "size", defaultValue = "100") Integer size) {
         if(size > 100) size = 100;
         Sort sort = Sort.by(
                 Sort.Order.desc("tanggal"),
@@ -53,12 +52,10 @@ public class KelasRest {
 
     @Operation(summary = "Mendapatkan daftar kelas yang masih tersedia")
     @GetMapping("/available")
-    public List<KelasModel> getJadwalAvailable(@RequestParam("jenisInvoice") Integer jenisInvoice) {
+    public List<KelasModel> getJadwalAvailable(@RequestParam(name = "jenisInvoice", required = false) Integer jenisInvoice) {
         var kelasList = kelasService.findAvailable(jenisInvoice);
         var kelasModelList = new ArrayList<KelasModel>();
-        kelasList.forEach(k -> {
-            kelasModelList.add(new KelasModel(k));
-        });
+        kelasList.forEach(k -> kelasModelList.add(new KelasModel(k)));
         return kelasModelList;
     }
 

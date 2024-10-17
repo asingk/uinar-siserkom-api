@@ -1,13 +1,14 @@
 package id.ac.arraniry.siserkomapi.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import lombok.Data;
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 
-@Data
+@Getter
+@Setter
 @Entity
 public class Mahasiswa {
     @Id
@@ -19,4 +20,8 @@ public class Mahasiswa {
     private Boolean isLulusMatkul;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    @OneToMany(mappedBy = "mahasiswa", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<MataKuliahMahasiswa> mataKuliah;
+    @OneToMany(mappedBy = "mahasiswa", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Invoice> invoice;
 }

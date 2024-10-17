@@ -116,8 +116,13 @@ public class KelasServiceImpl implements KelasService {
 
     @Override
     public List<Kelas> findAvailable(Integer idJenisInvoice) {
-        var result = kelasRepo.findByJenisInvoiceIdAndIsPenuh(idJenisInvoice, false);
-        result.removeIf(n -> LocalDateTime.of(n.getTanggal(), n.getJam()).isBefore(LocalDateTime.now()));
-        return result;
+        List<Kelas> kelasList;
+        if (null == idJenisInvoice) {
+            kelasList = kelasRepo.findByIsPenuh(false);
+        } else {
+            kelasList = kelasRepo.findByJenisInvoiceIdAndIsPenuh(idJenisInvoice, false);
+        }
+        kelasList.removeIf(n -> LocalDateTime.of(n.getTanggal(), n.getJam()).isBefore(LocalDateTime.now()));
+        return kelasList;
     }
 }

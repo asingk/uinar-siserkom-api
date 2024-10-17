@@ -32,11 +32,12 @@ public class MataKuliahRest {
     @GetMapping()
     public PagedModel<MataKuliahModel> getAll(
             @RequestParam(defaultValue = "") String searchString,
+            @RequestParam(name = "disabled", required = false) Boolean disabled,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
         if(size > 100) size = 100;
         var pageable = PageRequest.of(page, size, Sort.by("nama"));
-        var mk = matkulService.findAllCollectionModel(searchString, searchString, pageable);
+        var mk = matkulService.findAllCollectionModel(searchString, searchString, disabled, pageable);
         return pagedResourcesAssembler.toModel(mk, mataKuliahModelAssembler);
     }
 

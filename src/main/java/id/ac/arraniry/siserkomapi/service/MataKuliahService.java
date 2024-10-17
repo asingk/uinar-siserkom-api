@@ -10,7 +10,7 @@ import java.util.Optional;
 
 public interface MataKuliahService {
     Optional<MataKuliah> findById(String id);
-    Page<MataKuliah> findAllCollectionModel(String id, String nama, Pageable pageable);
+    Page<MataKuliah> findAllCollectionModel(String id, String nama, Boolean disabled, Pageable pageable);
     MataKuliah create(MataKuliahCreateReq req);
     void update(String id, MataKuliahUpdateReq req);
     void delete(String id);

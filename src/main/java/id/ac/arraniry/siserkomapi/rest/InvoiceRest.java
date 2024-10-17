@@ -45,7 +45,7 @@ public class InvoiceRest {
     @Operation(summary = "Mendapatkan invoice berdasarkan id")
     @GetMapping("/{id}")
     public InvoiceModel getInvoiceById(@PathVariable String id) {
-        var inv = invoiceService.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        var inv = invoiceService.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice tidak"));
         return new InvoiceModel(inv);
     }
 
@@ -62,11 +62,11 @@ public class InvoiceRest {
         invoiceService.deleteById(id);
     }
 
-//    @PostMapping("/{id}/bayar")
-//    @ResponseStatus(HttpStatus.NO_CONTENT)
-//    public void updateBayar(@PathVariable String id, @RequestParam String sevimaInv) {
-//        invoiceService.updateBayar(id, sevimaInv);
-//    }
+    @PostMapping("/{id}/bayar")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateBayar(@PathVariable String id, @RequestParam String sevimaInv) {
+        invoiceService.updateBayar(id, sevimaInv);
+    }
 
     @Operation(summary = "Memilih kelas berdasarkan nomor invoice")
     @PostMapping("/{id}/kelas/{idKelas}")

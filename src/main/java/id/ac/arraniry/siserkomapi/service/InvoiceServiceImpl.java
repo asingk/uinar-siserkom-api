@@ -1,37 +1,46 @@
 package id.ac.arraniry.siserkomapi.service;
 
-import id.ac.arraniry.siserkomapi.assembler.InvoiceModelAssembler;
-import id.ac.arraniry.siserkomapi.dto.UpdatedByReq;
-import id.ac.arraniry.siserkomapi.dto.NilaiUjianMahasiswaReq;
+import id.ac.arraniry.siserkomapi.dto.*;
 import id.ac.arraniry.siserkomapi.entity.Invoice;
 import id.ac.arraniry.siserkomapi.entity.NilaiUjian;
-import id.ac.arraniry.siserkomapi.repository.InvoiceRepo;
-import id.ac.arraniry.siserkomapi.repository.KelasRepo;
-import id.ac.arraniry.siserkomapi.repository.NilaiUjianRepo;
+import id.ac.arraniry.siserkomapi.repository.*;
 import id.ac.arraniry.siserkomapi.util.GlobalConstants;
+import org.springframework.core.env.Environment;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Random;
 
 @Service
 public class InvoiceServiceImpl implements InvoiceService {
     private final InvoiceRepo invoiceRepo;
     private final KelasRepo kelasRepo;
     private final NilaiUjianRepo nilaiUjianRepo;
-    private final InvoiceModelAssembler invoiceModelAssembler;
+    private final MahasiswaRepo mahasiswaRepo;
+    private final JenisInvoiceRepo jenisInvoiceRepo;
+    private final Environment environment;
 
-    public InvoiceServiceImpl(InvoiceRepo invoiceRepo, KelasRepo kelasRepo, NilaiUjianRepo nilaiUjianRepo, InvoiceModelAssembler invoiceModelAssembler) {
+    RestClient restClient = RestClient.create();
+
+    public InvoiceServiceImpl(InvoiceRepo invoiceRepo, KelasRepo kelasRepo, NilaiUjianRepo nilaiUjianRepo, MahasiswaRepo mahasiswaRepo,
+                              JenisInvoiceRepo jenisInvoiceRepo, Environment environment) {
         this.invoiceRepo = invoiceRepo;
         this.kelasRepo = kelasRepo;
         this.nilaiUjianRepo = nilaiUjianRepo;
-        this.invoiceModelAssembler = invoiceModelAssembler;
+        this.mahasiswaRepo = mahasiswaRepo;
+        this.jenisInvoiceRepo = jenisInvoiceRepo;
+        this.environment = environment;
     }
 
     @Override
@@ -52,6 +61,63 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Override
     public List<Invoice> findByNim(String nim) {
         return invoiceRepo.findByMahasiswaIdOrderByCreatedAtDesc(nim);
+    }
+
+    @Override
+    @Transactional
+    public Invoice create(String nim, Integer jenisInvoice) {
+        var mahasiswa = mahasiswaRepo.findById(nim).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mahasiswa tidak ditemukan!"));
+        if(null != mahasiswa.getCertificateNo()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Anda sudah mencetak sertifikat!");
+        }
+        if(mahasiswa.getIsLulusMatkul() && !GlobalConstants.JENIS_INVOICE_BUAT_SERTIFIKAT.equals(jenisInvoice)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Anda sudah lulus mata kuliah!");
+        }
+        mahasiswa.getInvoice().forEach(row -> {
+            if(!row.getIsExpired() && jenisInvoice.equals(row.getJenisInvoice().getId()))
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Invoice sebelumnya belum digunakan!");
+            if(row.getJenisInvoice().getId().equals(GlobalConstants.JENIS_INVOICE_BUAT_SERTIFIKAT) && row.getIsSudahBayar())
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Invoice buat sertifikat sudah dibayar, silahkan cetak sertifikat!");
+        });
+        var invoice = new Invoice();
+        invoice.setId(generateNoInvoice(jenisInvoice));
+        invoice.setJenisInvoice(jenisInvoiceRepo.findById(jenisInvoice)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jenis invoice tidak ditemukan!")));
+        invoice.setIsSudahBayar(false);
+        invoice.setIsExpired(false);
+        invoice.setMahasiswa(mahasiswa);
+        invoice.setCreatedAt(LocalDateTime.now());
+        mahasiswa.getInvoice().add(invoice);
+        return invoice;
+    }
+
+    private String generateNoInvoice(Integer kodeBayar) {
+        LocalDate now = LocalDate.now();
+        int tahun;
+        int semester;
+        if (now.getMonthValue() > 1 && now.getMonthValue() < 8) {
+            semester = 2;
+            tahun = now.getYear();
+        } else if (now.getMonthValue() > 7) {
+            semester = 1;
+            tahun = now.getYear();
+        } else {
+            semester = 1;
+            tahun = now.getYear()-1;
+        }
+        return kodeBayar.toString() + Integer.toString(tahun).substring(2, 4) + semester + randomString();
+    }
+
+    private String randomString() {
+        int leftLimit = 48; // numeral '0'
+        int rightLimit = 57; // numeral '9'
+        int targetStringLength = 5;
+        Random random = new Random();
+
+        return random.ints(leftLimit, rightLimit + 1)
+                .limit(targetStringLength)
+                .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
+                .toString();
     }
 
     @Override
@@ -93,5 +159,59 @@ public class InvoiceServiceImpl implements InvoiceService {
         invoice.setUpdatedAt(LocalDateTime.now());
         invoice.setUpdatedBy(req.getUpdatedBy());
         invoiceRepo.save(invoice);
+    }
+
+    @Override
+    public void updateBayar(String id, String sevimaInv) {
+        var invoice = invoiceRepo.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice tidak ditemukan!"));
+        if (invoice.getIsSudahBayar()) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "invoice ini sudah dibayar!!");
+        var respData = getSevimaInvId(invoice.getMahasiswa().getId(), sevimaInv);
+        if (!Objects.equals(respData.getAttributes().getIs_lunas(), "1"))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "tagihan belum dibayar!");
+        if (invoice.getJenisInvoice().getId().equals(GlobalConstants.JENIS_INVOICE_PELATIHAN)
+                && !respData.getAttributes().getId_jenis_akun().equals(GlobalConstants.SEVIMA_JENIS_INVOICE_PELATIHAN)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "jenis invoice tidak cocok!");
+        } else if (invoice.getJenisInvoice().getId().equals(GlobalConstants.JENIS_INVOICE_UJIAN)
+                && !respData.getAttributes().getId_jenis_akun().equals(GlobalConstants.SEVIMA_JENIS_INVOICE_UJIAN)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "jenis invoice tidak cocok!");
+        } else if (invoice.getJenisInvoice().getId().equals(GlobalConstants.JENIS_INVOICE_BUAT_SERTIFIKAT)
+                && !respData.getAttributes().getId_jenis_akun().equals(GlobalConstants.SEVIMA_JENIS_INVOICE_BUAT_SERTIFIKAT)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "jenis invoice tidak cocok!");
+        }
+        invoice.setSevimaInvId(respData.getId());
+        invoice.setSevimaInvKode(sevimaInv);
+        invoice.setIsSudahBayar(true);
+        if (GlobalConstants.JENIS_INVOICE_BUAT_SERTIFIKAT.equals(invoice.getJenisInvoice().getId())) invoice.setIsExpired(true);
+        invoice.setUpdatedAt(LocalDateTime.now());
+        try {
+            invoiceRepo.save(invoice);
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "kode tagihan sevima sudah pernah digunakan!");
+        }
+    }
+
+    @Override
+    public Optional<Invoice> findByMahasiswaIdAndIsLulusUjian(String nim, Boolean isLulusUjian) {
+        return invoiceRepo.findByMahasiswaIdAndIsLulusUjian(nim, isLulusUjian);
+    }
+
+    @Override
+    public Optional<Invoice> findByMahasiswaIdAndJenisInvoiceIdAndIsSudahBayar(String nim, Integer jenisInvoiceId, Boolean isSudahBayar) {
+        return invoiceRepo.findByMahasiswaIdAndJenisInvoiceIdAndIsSudahBayar(nim, jenisInvoiceId, isSudahBayar);
+    }
+
+    private InvoiceSevimaRespData getSevimaInvId(String nim, String sevimaInv) {
+        var invoiceSevimaResp = restClient.get()
+                .uri(GlobalConstants.SIAKAD_API_URL + "/mahasiswa/" + nim + "/invoice")
+                .header("X-App-Key", environment.getProperty("env.data.app-key"))
+                .header("X-Secret-Key", environment.getProperty("env.data.secret-key"))
+                .retrieve()
+                .body(InvoiceSevimaResp.class);
+        assert invoiceSevimaResp != null;
+        return invoiceSevimaResp.getData()
+                .stream()
+                .filter(row -> row.getAttributes().getKode_transaksi().equals(sevimaInv))
+                .findFirst().
+                orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "kode tagihan sevima pay tidak ditemukan!"));
     }
 }
