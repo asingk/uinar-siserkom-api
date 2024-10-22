@@ -49,16 +49,16 @@ public class MahasiswaRest {
     private static final Logger log = LoggerFactory.getLogger(MahasiswaRest.class);
 
     private static final String SAVE_FOLDER = File.separator + "var" + File.separator + "tmp";
-//    private static final String CDN_HOST = "192.168.176.227";
-    private static final String CDN_HOST = "103.107.187.227";
+    private static final String CDN_HOST = "192.168.176.227";
+//    private static final String CDN_HOST = "103.107.187.227";
     private static final String CDN_HOME_FOLDER = "/home/sertsftp/data";
     private static final String CDN_USERNAME = "sertsftp";
     private static final int SESSION_TIMEOUT = 10000;
     private static final int CHANNEL_TIMEOUT = 5000;
     // env prod
-//    private static final String CDN_SISERKOM_SERTIFIKAT_FOLDER = "/siserkom/sertifikat";
+    private static final String CDN_SISERKOM_SERTIFIKAT_FOLDER = "/siserkom/sertifikat";
     // env staging
-	private static final String CDN_SISERKOM_SERTIFIKAT_FOLDER = "/siserkom/staging_sertifikat";
+//	private static final String CDN_SISERKOM_SERTIFIKAT_FOLDER = "/siserkom/staging_sertifikat";
 
     private final PagedResourcesAssembler<Mahasiswa> pagedResourcesAssembler;
     private final MahasiswaService mahasiswaService;
