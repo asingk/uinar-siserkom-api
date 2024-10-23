@@ -64,8 +64,8 @@ public class InvoiceRest {
 
     @PostMapping("/{id}/bayar")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void updateBayar(@PathVariable String id, @RequestParam String sevimaInv) {
-        invoiceService.updateBayar(id, sevimaInv);
+    public void updateBayar(@PathVariable String id) {
+        invoiceService.updateBayar(id);
     }
 
     @Operation(summary = "Memilih kelas berdasarkan nomor invoice")

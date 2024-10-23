@@ -18,7 +18,7 @@ public interface InvoiceService {
     Invoice create(String nim, Integer jenisInvoice);
     void selectKelas(String noInvoice, Integer idKelas, UpdatedByReq req);
     void updateNilaiUjian(String id, NilaiUjianMahasiswaReq req);
-    void updateBayar(String id, String sevimaInv);
+    void updateBayar(String id);
 //    List<Invoice> findByMahasiswaIdAndIsLulusUjianOrderByCreatedAtDesc(String nim, Boolean isLulusUjian);
     Optional<Invoice> findByMahasiswaIdAndIsLulusUjian(String id, Boolean isLulusUjian);
     Optional<Invoice> findByMahasiswaIdAndJenisInvoiceIdAndIsSudahBayar(String nim, Integer jenisInvoiceId, Boolean isSudahBayar);

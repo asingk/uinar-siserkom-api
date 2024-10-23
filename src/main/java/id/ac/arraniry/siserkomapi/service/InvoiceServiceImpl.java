@@ -6,7 +6,6 @@ import id.ac.arraniry.siserkomapi.entity.NilaiUjian;
 import id.ac.arraniry.siserkomapi.repository.*;
 import id.ac.arraniry.siserkomapi.util.GlobalConstants;
 import org.springframework.core.env.Environment;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -21,6 +20,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 @Service
 public class InvoiceServiceImpl implements InvoiceService {
@@ -162,31 +162,21 @@ public class InvoiceServiceImpl implements InvoiceService {
     }
 
     @Override
-    public void updateBayar(String id, String sevimaInv) {
+    public void updateBayar(String id) {
         var invoice = invoiceRepo.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice tidak ditemukan!"));
         if (invoice.getIsSudahBayar()) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "invoice ini sudah dibayar!!");
-        var respData = getSevimaInvId(invoice.getMahasiswa().getId(), sevimaInv);
-        if (!Objects.equals(respData.getAttributes().getIs_lunas(), "1"))
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "tagihan belum dibayar!");
-        if (invoice.getJenisInvoice().getId().equals(GlobalConstants.JENIS_INVOICE_PELATIHAN)
-                && !respData.getAttributes().getId_jenis_akun().equals(GlobalConstants.SEVIMA_JENIS_INVOICE_PELATIHAN)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "jenis invoice tidak cocok!");
-        } else if (invoice.getJenisInvoice().getId().equals(GlobalConstants.JENIS_INVOICE_UJIAN)
-                && !respData.getAttributes().getId_jenis_akun().equals(GlobalConstants.SEVIMA_JENIS_INVOICE_UJIAN)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "jenis invoice tidak cocok!");
-        } else if (invoice.getJenisInvoice().getId().equals(GlobalConstants.JENIS_INVOICE_BUAT_SERTIFIKAT)
-                && !respData.getAttributes().getId_jenis_akun().equals(GlobalConstants.SEVIMA_JENIS_INVOICE_BUAT_SERTIFIKAT)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "jenis invoice tidak cocok!");
-        }
-        invoice.setSevimaInvId(respData.getId());
-        invoice.setSevimaInvKode(sevimaInv);
-        invoice.setIsSudahBayar(true);
-        if (GlobalConstants.JENIS_INVOICE_BUAT_SERTIFIKAT.equals(invoice.getJenisInvoice().getId())) invoice.setIsExpired(true);
-        invoice.setUpdatedAt(LocalDateTime.now());
-        try {
-            invoiceRepo.save(invoice);
-        } catch (DataIntegrityViolationException e) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "kode tagihan sevima sudah pernah digunakan!");
+        var respDataList = getSevimaInvId(invoice);
+        for(InvoiceSevimaRespData row: respDataList) {
+            var opt = invoiceRepo.findBySevimaInvId(row.getId());
+            if (opt.isEmpty()) {
+                invoice.setSevimaInvId(row.getId());
+                invoice.setSevimaInvKode(row.getAttributes().getKode_transaksi());
+                invoice.setIsSudahBayar(true);
+                if (GlobalConstants.JENIS_INVOICE_BUAT_SERTIFIKAT.equals(invoice.getJenisInvoice().getId())) invoice.setIsExpired(true);
+                invoice.setUpdatedAt(LocalDateTime.now());
+                invoiceRepo.save(invoice);
+                break;
+            }
         }
     }
 
@@ -200,18 +190,29 @@ public class InvoiceServiceImpl implements InvoiceService {
         return invoiceRepo.findByMahasiswaIdAndJenisInvoiceIdAndIsSudahBayar(nim, jenisInvoiceId, isSudahBayar);
     }
 
-    private InvoiceSevimaRespData getSevimaInvId(String nim, String sevimaInv) {
+    private List<InvoiceSevimaRespData> getSevimaInvId(Invoice invoice) {
         var invoiceSevimaResp = restClient.get()
-                .uri(GlobalConstants.SIAKAD_API_URL + "/mahasiswa/" + nim + "/invoice")
+                .uri(GlobalConstants.SIAKAD_API_URL + "/mahasiswa/" + invoice.getMahasiswa().getId() + "/invoice")
                 .header("X-App-Key", environment.getProperty("env.data.app-key"))
                 .header("X-Secret-Key", environment.getProperty("env.data.secret-key"))
                 .retrieve()
                 .body(InvoiceSevimaResp.class);
         assert invoiceSevimaResp != null;
+        String sevimaJenisTagihan;
+        if (invoice.getJenisInvoice().getId().equals(GlobalConstants.JENIS_INVOICE_PELATIHAN)) {
+            sevimaJenisTagihan = GlobalConstants.SEVIMA_JENIS_INVOICE_PELATIHAN;
+        } else if (invoice.getJenisInvoice().getId().equals(GlobalConstants.JENIS_INVOICE_UJIAN)) {
+            sevimaJenisTagihan = GlobalConstants.SEVIMA_JENIS_INVOICE_UJIAN;
+        } else if (invoice.getJenisInvoice().getId().equals(GlobalConstants.JENIS_INVOICE_BUAT_SERTIFIKAT)) {
+            sevimaJenisTagihan = GlobalConstants.SEVIMA_JENIS_INVOICE_BUAT_SERTIFIKAT;
+        } else {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "jenis invoice tidak ditemukan!");
+        }
         return invoiceSevimaResp.getData()
                 .stream()
-                .filter(row -> row.getAttributes().getKode_transaksi().equals(sevimaInv))
-                .findFirst().
-                orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "kode tagihan sevima pay tidak ditemukan!"));
+                .filter(row -> row.getAttributes().getIs_lunas().equals("1")
+                                && row.getAttributes().getTanggal_transaksi().toLocalDateTime().isAfter(invoice.getCreatedAt().minusHours(7))
+                                && row.getAttributes().getId_jenis_akun().equals(sevimaJenisTagihan))
+                .collect(Collectors.toList());
     }
 }

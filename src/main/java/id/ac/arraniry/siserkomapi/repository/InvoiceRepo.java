@@ -15,4 +15,5 @@ public interface InvoiceRepo extends JpaRepository<Invoice, String> {
     List<Invoice> findByKelasIdOrderByMahasiswaNamaAsc(Integer kelasId);
     Optional<Invoice> findByMahasiswaIdAndIsLulusUjian(String nim, Boolean isLulusUjian);
     Optional<Invoice> findByMahasiswaIdAndJenisInvoiceIdAndIsSudahBayar(String nim, Integer jenisInvoiceId, Boolean isSudahBayar);
+    Optional<Invoice> findBySevimaInvId(String sevimaInvId);
 }
