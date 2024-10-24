@@ -71,7 +71,9 @@ public class InvoiceServiceImpl implements InvoiceService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Anda sudah mencetak sertifikat!");
         }
         if(mahasiswa.getIsLulusMatkul() && !GlobalConstants.JENIS_INVOICE_BUAT_SERTIFIKAT.equals(jenisInvoice)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Anda sudah lulus mata kuliah!");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Anda sudah lulus mata kuliah komputer!");
+        } else if (!mahasiswa.getIsLulusMatkul() && GlobalConstants.JENIS_INVOICE_BUAT_SERTIFIKAT.equals(jenisInvoice)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Anda tidak lulus mata kuliah komputer!");
         }
         mahasiswa.getInvoice().forEach(row -> {
             if(!row.getIsExpired() && jenisInvoice.equals(row.getJenisInvoice().getId()))
