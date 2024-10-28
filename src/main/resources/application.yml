@@ -12,12 +12,14 @@ server:
   servlet:
     context-path: /siserkom/v4
   forward-headers-strategy: framework
+  error:
+    include-message: always
 
-#logging:
-#  file:
-#    path: /tmp
-#  level:
-#    id.ac.arraniry.siserkomapi: trace
+logging:
+  file:
+    path: /var/tmp
+  level:
+    id.ac.arraniry.siserkomapi: trace
 
 env:
   data:

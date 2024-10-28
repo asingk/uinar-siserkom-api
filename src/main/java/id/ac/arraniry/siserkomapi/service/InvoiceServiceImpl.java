@@ -168,18 +168,18 @@ public class InvoiceServiceImpl implements InvoiceService {
         var invoice = invoiceRepo.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice tidak ditemukan!"));
         if (invoice.getIsSudahBayar()) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "invoice ini sudah dibayar!!");
         var respDataList = getSevimaInvId(invoice);
-        for(InvoiceSevimaRespData row: respDataList) {
-            var opt = invoiceRepo.findBySevimaInvId(row.getId());
-            if (opt.isEmpty()) {
-                invoice.setSevimaInvId(row.getId());
-                invoice.setSevimaInvKode(row.getAttributes().getKode_transaksi());
-                invoice.setIsSudahBayar(true);
-                if (GlobalConstants.JENIS_INVOICE_BUAT_SERTIFIKAT.equals(invoice.getJenisInvoice().getId())) invoice.setIsExpired(true);
-                invoice.setUpdatedAt(LocalDateTime.now());
-                invoiceRepo.save(invoice);
-                break;
-            }
-        }
+        if (respDataList.isEmpty())
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "invoice belum dibayar!!");
+        var respData = respDataList.get(0);
+        var opt = invoiceRepo.findBySevimaInvId(respData.getId());
+        if (opt.isPresent())
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "invoice belum dibayar!!");
+        invoice.setSevimaInvId(respData.getId());
+        invoice.setSevimaInvKode(respData.getAttributes().getKode_transaksi());
+        invoice.setIsSudahBayar(true);
+        if (GlobalConstants.JENIS_INVOICE_BUAT_SERTIFIKAT.equals(invoice.getJenisInvoice().getId())) invoice.setIsExpired(true);
+        invoice.setUpdatedAt(LocalDateTime.now());
+        invoiceRepo.save(invoice);
     }
 
     @Override
