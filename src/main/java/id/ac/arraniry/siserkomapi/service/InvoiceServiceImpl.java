@@ -16,6 +16,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -213,7 +215,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         return invoiceSevimaResp.getData()
                 .stream()
                 .filter(row -> row.getAttributes().getIs_lunas().equals("1")
-                                && row.getAttributes().getTanggal_transaksi().toLocalDateTime().isAfter(invoice.getCreatedAt().minusHours(7))
+                                && row.getAttributes().getTanggal_transaksi().withZoneSameInstant(ZoneId.of("Asia/Jakarta")).toLocalDateTime().isAfter(invoice.getCreatedAt())
                                 && row.getAttributes().getId_jenis_akun().equals(sevimaJenisTagihan))
                 .collect(Collectors.toList());
     }
