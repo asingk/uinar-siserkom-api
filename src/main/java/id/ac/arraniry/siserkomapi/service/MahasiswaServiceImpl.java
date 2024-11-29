@@ -98,13 +98,12 @@ public class MahasiswaServiceImpl implements MahasiswaService {
 
     private List<KhsSevimaRespDataAttributes> cekNilaiMataKuliah(String nim) {
         var khsSevimaResp = restClient.get()
-                .uri(GlobalConstants.SIAKAD_API_URL + "/mahasiswa/" + nim + "/khs")
+                .uri(GlobalConstants.SIAKAD_API_URL + "/mahasiswa/" + nim + "/transkrip")
                 .header("X-App-Key", environment.getProperty("env.data.app-key"))
                 .header("X-Secret-Key", environment.getProperty("env.data.secret-key"))
                 .retrieve()
                 .body(KhsSevimaResp.class);
         assert khsSevimaResp != null;
-        khsSevimaResp.getData().removeIf(n -> !Objects.equals(n.getAttributes().getIs_pakai(), "1"));
         List<KhsSevimaRespDataAttributes> khsSevimaRespDataAttributes = new ArrayList<>();
         khsSevimaResp.getData().forEach(n -> khsSevimaRespDataAttributes.add(n.getAttributes()));
         khsSevimaRespDataAttributes.sort(Comparator.comparing(KhsSevimaRespDataAttributes::getKode_mata_kuliah));
