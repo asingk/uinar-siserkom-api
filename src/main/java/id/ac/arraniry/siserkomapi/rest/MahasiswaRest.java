@@ -12,6 +12,7 @@ import id.ac.arraniry.siserkomapi.dto.InvoiceModel;
 import id.ac.arraniry.siserkomapi.dto.MahasiswaModel;
 import id.ac.arraniry.siserkomapi.dto.MataKuliahMahasiswaModel;
 import id.ac.arraniry.siserkomapi.entity.Mahasiswa;
+import id.ac.arraniry.siserkomapi.entity.MataKuliahMahasiswa;
 import id.ac.arraniry.siserkomapi.service.InvoiceService;
 import id.ac.arraniry.siserkomapi.service.MahasiswaService;
 import id.ac.arraniry.siserkomapi.util.GlobalConstants;
@@ -55,10 +56,6 @@ public class MahasiswaRest {
     private static final String CDN_USERNAME = "sertsftp";
     private static final int SESSION_TIMEOUT = 10000;
     private static final int CHANNEL_TIMEOUT = 5000;
-    // env prod
-    private static final String CDN_SISERKOM_SERTIFIKAT_FOLDER = "/siserkom/sertifikat";
-    // env staging
-//	private static final String CDN_SISERKOM_SERTIFIKAT_FOLDER = "/siserkom/staging_sertifikat";
 
     private final PagedResourcesAssembler<Mahasiswa> pagedResourcesAssembler;
     private final MahasiswaService mahasiswaService;
@@ -192,12 +189,23 @@ public class MahasiswaRest {
         parameters.put("qrcode", generateQRCode(filename));
         parameters.put("verifikasiUrl", GlobalConstants.SERTIFIKAT_URL + "/" + filename);
         parameters.put("nomor", "Un.08/PTIPD/PP.00.9/" + filename + "/" + LocalDate.now().getYear());
-
-        JasperPrint jasperPrint = JasperFillManager.fillReport(reportStream, parameters, new JREmptyDataSource() );
+        StringBuilder paramMatkul = new StringBuilder();
+        for (MataKuliahMahasiswa matkulMhs : mahasiswa.getMataKuliah() ) {
+            if (matkulMhs.getIsLulus()) {
+                if (!paramMatkul.toString().isEmpty()) {
+                    paramMatkul.append("\n");
+                }
+                paramMatkul.append(matkulMhs.getMataKuliah().getNama()).append(" : ").append(matkulMhs.getNilai());
+            }
+        }
+        parameters.put("matakuliah", paramMatkul.toString());
+        JasperPrint jasperPrint = JasperFillManager.fillReport(reportStream, parameters, new JREmptyDataSource());
+        JasperExportManager.exportReportToPdfFile(jasperPrint, SAVE_FOLDER + File.separator + filename + ".pdf");
         extractPrintImage(filename, jasperPrint);
         uploadFile(filename);
         Files.delete(Paths.get(SAVE_FOLDER + File.separator + filename + ".png"));
         Files.delete(Paths.get(SAVE_FOLDER + File.separator + filename + ".jpg"));
+        Files.delete(Paths.get(SAVE_FOLDER + File.separator + filename + ".pdf"));
     }
 
     private static String convertToTitleCaseIteratingChars(String text) {
@@ -249,7 +257,7 @@ public class MahasiswaRest {
         log.debug("---uploadFile start---");
 
         String localFile = SAVE_FOLDER + File.separator + filename;
-        String remoteDir = CDN_HOME_FOLDER + CDN_SISERKOM_SERTIFIKAT_FOLDER + File.separator;
+        String remoteDir = CDN_HOME_FOLDER + GlobalConstants.CDN_SISERKOM_SERTIFIKAT_FOLDER + File.separator;
         Session jschSession = null;
         try {
             JSch jsch = new JSch();
@@ -263,6 +271,7 @@ public class MahasiswaRest {
 
             ChannelSftp channelSftp = (ChannelSftp) sftp;
 
+            channelSftp.put(localFile + ".pdf", remoteDir + filename + ".pdf");
             channelSftp.put(localFile + ".jpg", remoteDir + filename + ".jpg");
             channelSftp.exit();
         } catch (JSchException | SftpException e) {
