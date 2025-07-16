@@ -9,11 +9,12 @@ spring:
 #    show-sql: true
 server:
   port : 8088
-  servlet:
-    context-path: /siserkom/v4
+#  servlet:
+#    context-path: /siserkom/v4
   forward-headers-strategy: framework
   error:
     include-message: always
+    include-stacktrace: never
 
 logging:
   file:

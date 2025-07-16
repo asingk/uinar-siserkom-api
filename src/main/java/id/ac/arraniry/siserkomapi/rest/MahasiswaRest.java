@@ -50,10 +50,6 @@ public class MahasiswaRest {
     private static final Logger log = LoggerFactory.getLogger(MahasiswaRest.class);
 
     private static final String SAVE_FOLDER = File.separator + "var" + File.separator + "tmp";
-    private static final String CDN_HOST = "192.168.176.227";
-//    private static final String CDN_HOST = "103.107.187.227";
-    private static final String CDN_HOME_FOLDER = "/home/sertsftp/data";
-    private static final String CDN_USERNAME = "sertsftp";
     private static final int SESSION_TIMEOUT = 10000;
     private static final int CHANNEL_TIMEOUT = 5000;
 
@@ -257,12 +253,12 @@ public class MahasiswaRest {
         log.debug("---uploadFile start---");
 
         String localFile = SAVE_FOLDER + File.separator + filename;
-        String remoteDir = CDN_HOME_FOLDER + GlobalConstants.CDN_SISERKOM_SERTIFIKAT_FOLDER + File.separator;
+        String remoteDir = GlobalConstants.CDN_HOME_FOLDER + GlobalConstants.CDN_SISERKOM_SERTIFIKAT_FOLDER + File.separator;
         Session jschSession = null;
         try {
             JSch jsch = new JSch();
             jsch.setKnownHosts("/home/asingk/.ssh/known_hosts");
-            jschSession = jsch.getSession(CDN_USERNAME, CDN_HOST);
+            jschSession = jsch.getSession(GlobalConstants.CDN_USERNAME, GlobalConstants.CDN_HOST);
             jschSession.setPassword(environment.getProperty("env.data.cdn-password"));
             jschSession.connect(SESSION_TIMEOUT);
 

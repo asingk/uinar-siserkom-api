@@ -14,7 +14,7 @@ RUN addgroup -S asingk && adduser -S asingk -G asingk
 USER asingk
 RUN mkdir -p ~/.ssh
 RUN touch ~/.ssh/known_hosts
-RUN	ssh-keyscan -H 192.168.176.227 >> ~/.ssh/known_hosts
+RUN	ssh-keyscan -H 192.168.176.26 >> ~/.ssh/known_hosts
 
 #ARG JAR_FILE=build/libs/*SNAPSHOT.jar
 ARG JAR_FILE=build/libs/*RELEASE.jar
