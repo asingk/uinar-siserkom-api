@@ -1,22 +1,32 @@
-FROM eclipse-temurin:17-jdk-alpine
+FROM eclipse-temurin:17-jre-jammy
 LABEL authors="asingk"
 
-RUN apk add --no-cache tzdata
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tzdata openssh-client ca-certificates fontconfig && \
+    rm -rf /var/lib/apt/lists/*
 ENV TZ=Asia/Jakarta
-RUN apk add --no-cache openssh
 
-COPY fonts/*.ttf ./
-RUN mkdir -p /usr/share/fonts/truetype/
-RUN install -m644 *.ttf /usr/share/fonts/truetype/
-RUN rm ./*.ttf
+# Create group and user with home directory
+RUN groupadd -r asingk && useradd -r -g asingk -d /home/asingk -m -s /bin/bash asingk
 
-RUN addgroup -S asingk && adduser -S asingk -G asingk
+# Prepare fonts
+COPY fonts/*.ttf /tmp/fonts/
+RUN mkdir -p /usr/share/fonts/truetype/ && \
+    install -m644 /tmp/fonts/*.ttf /usr/share/fonts/truetype/ && \
+    fc-cache -f && \
+    rm -rf /tmp/fonts
+
+# Prepare SSH known_hosts as root, then fix ownership
+RUN mkdir -p /home/asingk/.ssh && \
+    touch /home/asingk/.ssh/known_hosts && \
+    ssh-keyscan -H 192.168.176.26 >> /home/asingk/.ssh/known_hosts && \
+    chown -R asingk:asingk /home/asingk
+
 USER asingk
-RUN mkdir -p ~/.ssh
-RUN touch ~/.ssh/known_hosts
-RUN	ssh-keyscan -H 192.168.176.26 >> ~/.ssh/known_hosts
+WORKDIR /home/asingk
 
 #ARG JAR_FILE=build/libs/*SNAPSHOT.jar
 ARG JAR_FILE=build/libs/*RELEASE.jar
-COPY ${JAR_FILE} app.jar
-ENTRYPOINT ["java","-jar","/app.jar"]
+COPY --chown=asingk:asingk ${JAR_FILE} app.jar
+
+ENTRYPOINT ["java","-jar","app.jar"]

@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'id.ac.ar-raniry'
-version = '4.3.1.2.RELEASE'
+version = '4.3.1.4.RELEASE'
 
 java {
     toolchain {
@@ -40,7 +40,7 @@ dependencies {
     implementation 'com.github.mwiede:jsch:2.27.2'
     compileOnly 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
-    runtimeOnly 'com.mysql:mysql-connector-j'
+    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
