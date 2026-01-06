@@ -5,6 +5,7 @@ import id.ac.arraniry.siserkomapi.entity.Invoice;
 import id.ac.arraniry.siserkomapi.entity.NilaiUjian;
 import id.ac.arraniry.siserkomapi.repository.*;
 import id.ac.arraniry.siserkomapi.util.GlobalConstants;
+import org.jspecify.annotations.NonNull;
 import org.springframework.core.env.Environment;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,11 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -202,6 +199,19 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .retrieve()
                 .body(InvoiceSevimaResp.class);
         assert invoiceSevimaResp != null;
+        String sevimaJenisTagihan = getSevimaJenisTagihan(invoice);
+        return invoiceSevimaResp.getData()
+                .stream()
+                .filter(row -> row.getAttributes().getIs_lunas().equals("1")
+                                && row.getAttributes().getTanggal_transaksi().withZoneSameInstant(ZoneId.of("Asia/Jakarta")).toLocalDateTime()
+                        .isAfter(invoice.getCreatedAt())
+                                && row.getAttributes().getId_jenis_akun().equals(sevimaJenisTagihan))
+                .sorted(Comparator.comparing(row -> row.getAttributes().getTanggal_transaksi(),
+                        Comparator.reverseOrder()))
+                .collect(Collectors.toList());
+    }
+
+    private static @NonNull String getSevimaJenisTagihan(Invoice invoice) {
         String sevimaJenisTagihan;
         if (invoice.getJenisInvoice().getId().equals(GlobalConstants.JENIS_INVOICE_PELATIHAN)) {
             sevimaJenisTagihan = GlobalConstants.SEVIMA_JENIS_INVOICE_PELATIHAN;
@@ -212,11 +222,6 @@ public class InvoiceServiceImpl implements InvoiceService {
         } else {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "jenis invoice tidak ditemukan!");
         }
-        return invoiceSevimaResp.getData()
-                .stream()
-                .filter(row -> row.getAttributes().getIs_lunas().equals("1")
-                                && row.getAttributes().getTanggal_transaksi().withZoneSameInstant(ZoneId.of("Asia/Jakarta")).toLocalDateTime().isAfter(invoice.getCreatedAt())
-                                && row.getAttributes().getId_jenis_akun().equals(sevimaJenisTagihan))
-                .collect(Collectors.toList());
+        return sevimaJenisTagihan;
     }
 }
