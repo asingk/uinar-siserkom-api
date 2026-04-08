@@ -7,12 +7,17 @@ import id.ac.arraniry.siserkomapi.entity.MataKuliahMahasiswa;
 import id.ac.arraniry.siserkomapi.repository.MahasiswaRepo;
 import id.ac.arraniry.siserkomapi.repository.MataKuliahRepo;
 import id.ac.arraniry.siserkomapi.util.GlobalConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -21,6 +26,8 @@ import java.util.*;
 
 @Service
 public class MahasiswaServiceImpl implements MahasiswaService {
+    private static final Logger log = LoggerFactory.getLogger(MahasiswaServiceImpl.class);
+
     private final MahasiswaRepo mahasiswaRepo;
     private final Environment environment;
     private final MataKuliahRepo mataKuliahRepo;
@@ -97,35 +104,95 @@ public class MahasiswaServiceImpl implements MahasiswaService {
     }
 
     private List<KhsSevimaRespDataAttributes> cekNilaiMataKuliah(String nim) {
-        var khsSevimaResp = restClient.get()
-                .uri(GlobalConstants.SIAKAD_API_URL + "/mahasiswa/" + nim + "/transkrip")
-                .header("X-App-Key", environment.getProperty("env.data.app-key"))
-                .header("X-Secret-Key", environment.getProperty("env.data.secret-key"))
-                .retrieve()
-                .body(KhsSevimaResp.class);
-        assert khsSevimaResp != null;
         List<KhsSevimaRespDataAttributes> khsSevimaRespDataAttributes = new ArrayList<>();
-        khsSevimaResp.getData().forEach(n -> khsSevimaRespDataAttributes.add(n.getAttributes()));
-        khsSevimaRespDataAttributes.sort(Comparator.comparing(KhsSevimaRespDataAttributes::getKode_mata_kuliah));
-        var matkulDiakuiList = mataKuliahRepo.findByIsDisabledOrderById(false);
-        var matkulMhs = new ArrayList<KhsSevimaRespDataAttributes>();
-        int j = 0;
-        int startJ = 0;
-        for (MataKuliah mataKuliah : matkulDiakuiList) {
-            while (j < khsSevimaRespDataAttributes.size()) {
-                if (mataKuliah.getId().equals(khsSevimaRespDataAttributes.get(j).getKode_mata_kuliah())) {
-                    matkulMhs.add(khsSevimaRespDataAttributes.get(j));
-                    startJ = j;
-                    break;
+
+        // 1. Fetch transkrip from SIAKAD API
+        try {
+            var khsSevimaResp = restClient.get()
+                    .uri(GlobalConstants.SIAKAD_API_URL + "/mahasiswa/" + nim + "/transkrip")
+                    .header("X-App-Key", environment.getProperty("env.data.app-key"))
+                    .header("X-Secret-Key", environment.getProperty("env.data.secret-key"))
+                    .retrieve()
+                    .body(KhsSevimaResp.class);
+
+            if (khsSevimaResp == null || khsSevimaResp.getData() == null) {
+                log.warn("[cekNilaiMataKuliah] Response or data is null for NIM: {}", nim);
+                return khsSevimaRespDataAttributes;
+            }
+
+            khsSevimaResp.getData().forEach(n -> {
+                if (n.getAttributes() != null) {
+                    khsSevimaRespDataAttributes.add(n.getAttributes());
+                } else {
+                    log.warn("[cekNilaiMataKuliah] Null attributes found in transkrip data for NIM: {}", nim);
                 }
-                j++;
-            }
-            if (matkulMhs.isEmpty()) {
-                j = 0;
-            } else {
-                j = startJ;
-            }
+            });
+
+            log.info("[cekNilaiMataKuliah] Fetched {} transkrip records for NIM: {}", khsSevimaRespDataAttributes.size(), nim);
+
+        } catch (HttpClientErrorException e) {
+            log.error("[cekNilaiMataKuliah] Client error for NIM: {} | Status: {} | Body: {}",
+                    nim, e.getStatusCode(), e.getResponseBodyAsString(), e);
+            return khsSevimaRespDataAttributes;
+
+        } catch (HttpServerErrorException e) {
+            log.error("[cekNilaiMataKuliah] Server error for NIM: {} | Status: {} | Body: {}",
+                    nim, e.getStatusCode(), e.getResponseBodyAsString(), e);
+            return khsSevimaRespDataAttributes;
+
+        } catch (ResourceAccessException e) {
+            log.error("[cekNilaiMataKuliah] Connection error for NIM: {} | Message: {}",
+                    nim, e.getMessage(), e);
+            return khsSevimaRespDataAttributes;
+
+        } catch (Exception e) {
+            log.error("[cekNilaiMataKuliah] Unexpected error fetching transkrip for NIM: {}", nim, e);
+            return khsSevimaRespDataAttributes;
         }
+
+        // 2. Sort transkrip by kode mata kuliah
+        try {
+            khsSevimaRespDataAttributes.sort(Comparator.comparing(KhsSevimaRespDataAttributes::getKode_mata_kuliah));
+        } catch (Exception e) {
+            log.error("[cekNilaiMataKuliah] Failed to sort transkrip data for NIM: {}", nim, e);
+            return khsSevimaRespDataAttributes;
+        }
+
+        // 3. Match with recognized mata kuliah from DB
+        var matkulMhs = new ArrayList<KhsSevimaRespDataAttributes>();
+        try {
+            var matkulDiakuiList = mataKuliahRepo.findByIsDisabledOrderById(false);
+
+            if (matkulDiakuiList == null || matkulDiakuiList.isEmpty()) {
+                log.warn("[cekNilaiMataKuliah] No active mata kuliah found in database");
+                return matkulMhs;
+            }
+
+            int j = 0;
+            int startJ = 0;
+            for (MataKuliah mataKuliah : matkulDiakuiList) {
+                while (j < khsSevimaRespDataAttributes.size()) {
+                    if (mataKuliah.getId().equals(khsSevimaRespDataAttributes.get(j).getKode_mata_kuliah())) {
+                        matkulMhs.add(khsSevimaRespDataAttributes.get(j));
+                        startJ = j;
+                        break;
+                    }
+                    j++;
+                }
+                if (matkulMhs.isEmpty()) {
+                    j = 0;
+                } else {
+                    j = startJ;
+                }
+            }
+
+            log.info("[cekNilaiMataKuliah] Matched {} mata kuliah for NIM: {}", matkulMhs.size(), nim);
+
+        } catch (Exception e) {
+            log.error("[cekNilaiMataKuliah] Error matching mata kuliah for NIM: {}", nim, e);
+            return matkulMhs;
+        }
+
         return matkulMhs;
     }
 
